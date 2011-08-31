@@ -9,7 +9,5 @@
             </intent-filter>
         </activity>
 
-        <activity android:name="GrocerySyncPreferencesActivity" android:configChanges="keyboardHidden|orientation"/>
-
-    <service android:name="com.couchbase.android.CouchbaseService" android:enabled="true" android:exported="false"/></application>
+        <activity android:name="GrocerySyncPreferencesActivity" android:configChanges="keyboardHidden|orientation"/><service android:name="com.couchbase.android.CouchbaseService" android:enabled="true" android:exported="false"/></application>
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/><uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/></manifest>
