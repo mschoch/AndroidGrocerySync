@@ -56,7 +56,8 @@ public class CouchChangesAsyncTask extends AsyncTask<Integer, DocumentChange, Vo
 				parent.rowMap.remove(id);
 			}
 			else {
-				parent.rowMap.put(id, documentChange.getDocAsNode());
+				GroceryItem item = new GroceryItem(documentChange.getDocAsNode());
+				parent.rowMap.put(id, item);
 			}
 		}
 		parent.notifyDataSetChanged();

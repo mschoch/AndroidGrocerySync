@@ -1,13 +1,5 @@
 package com.couchbase.grocerysync;
 
-import java.util.Calendar;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.node.ObjectNode;
 import org.ektorp.CouchDbConnector;
 import org.ektorp.CouchDbInstance;
 import org.ektorp.ReplicationCommand;
@@ -24,7 +16,6 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.preference.PreferenceManager;
-import android.text.format.DateFormat;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -36,8 +27,8 @@ import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.EditText;
 import android.widget.ListView;
 
-import com.couchbase.android.ICouchbaseDelegate;
 import com.couchbase.android.CouchbaseMobile;
+import com.couchbase.android.ICouchbaseDelegate;
 
 public class AndroidGrocerySyncActivity extends Activity implements OnItemClickListener, OnItemLongClickListener, OnKeyListener {
 	
@@ -56,6 +47,8 @@ public class AndroidGrocerySyncActivity extends Activity implements OnItemClickL
 	
 	//ektorp impl
 	protected CouchDbConnector couchDbConnector;
+	protected ReplicationCommand pushReplication;
+	protected ReplicationCommand pullReplication;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -75,11 +68,14 @@ public class AndroidGrocerySyncActivity extends Activity implements OnItemClickL
     }
     
 	protected void onDestroy() {
-		super.onDestroy();
+
 		try {
 			unbindService(couchServiceConnection);
 		} catch (IllegalArgumentException e) {
-		}
+			//ignore
+		}		
+		
+		super.onDestroy();
 	}    
     
     protected ICouchbaseDelegate couchCallbackHandler = new ICouchbaseDelegate.Stub() {
@@ -117,7 +113,7 @@ public class AndroidGrocerySyncActivity extends Activity implements OnItemClickL
 			
 			SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
 			
-			ReplicationCommand pushReplication = new ReplicationCommand.Builder()
+			pushReplication = new ReplicationCommand.Builder()
 				.source(DATABASE_NAME)
 				.target(prefs.getString("sync_url", "http://couchbase.iriscouch.com/grocery-sync"))
 				.continuous(true)
@@ -125,7 +121,7 @@ public class AndroidGrocerySyncActivity extends Activity implements OnItemClickL
 			
 			dbInstance.replicate(pushReplication);
 			
-			ReplicationCommand pullReplication = new ReplicationCommand.Builder()
+			pullReplication = new ReplicationCommand.Builder()
 				.source(prefs.getString("sync_url", "http://couchbase.iriscouch.com/grocery-sync"))
 				.target(DATABASE_NAME)
 				.continuous(true)
@@ -162,8 +158,8 @@ public class AndroidGrocerySyncActivity extends Activity implements OnItemClickL
 	 * Handle click on item in list
 	 */
 	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-		JsonNode document = (JsonNode)parent.getItemAtPosition(position);
-		toggleItemChecked(document);
+		GroceryItem item = (GroceryItem)parent.getItemAtPosition(position);
+		toggleItemChecked(item);
 	}
 	
 	/**
@@ -171,15 +167,14 @@ public class AndroidGrocerySyncActivity extends Activity implements OnItemClickL
 	 */
 	public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
 
-		final JsonNode document = (JsonNode)parent.getItemAtPosition(position);
-        JsonNode textNode = document.get("text");
+		final GroceryItem item = (GroceryItem)parent.getItemAtPosition(position);
 		
 		AlertDialog.Builder builder = new AlertDialog.Builder(AndroidGrocerySyncActivity.this);
 		AlertDialog alert = builder.setTitle("Delete Item?")
-			   .setMessage("Are you sure you want to delete " + textNode.getValueAsText() + "?")
+			   .setMessage("Are you sure you want to delete \"" + item.getText() + "\"?")
 		       .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
 		           public void onClick(DialogInterface dialog, int id) {
-		        	   deleteGroceryItem(document);
+		        	   deleteGroceryItem(item);
 		           }
 		       })
 		       .setNegativeButton("No", new DialogInterface.OnClickListener() {
@@ -233,41 +228,20 @@ public class AndroidGrocerySyncActivity extends Activity implements OnItemClickL
     }
     
     public void createGroceryItem(String name) {
-    	UUID uuid = UUID.randomUUID();
-    	Calendar calendar = GregorianCalendar.getInstance();
-    	long currentTime = calendar.getTimeInMillis();
-    	String currentTimeString = DateFormat.format("EEEE-MM-dd'T'HH:mm:ss.SSS'Z'", calendar).toString();
-    	
-    	String id = currentTime + "-" + uuid.toString();
-    	
-    	Map<String, String> newItem = new HashMap<String, String>();
-    	newItem.put("_id", id);
-    	newItem.put("text", name);
-    	newItem.put("check", Boolean.FALSE.toString());
-    	newItem.put("created_at", currentTimeString);
-    	
+    	GroceryItem item = GroceryItem.createWithText(name);
     	CouchDocumentAsyncTask createTask = new CouchDocumentAsyncTask(couchDbConnector, CouchDocumentAsyncTask.OPERATION_CREATE);
-    	createTask.execute(newItem);
+    	createTask.execute(item);
     }
     
-    public void toggleItemChecked(JsonNode document) {
-    	JsonNode check = document.get("check");
-    	if(check.getBooleanValue()) {
-    		ObjectNode documentObject = (ObjectNode)document;
-    		documentObject.put("check", false);
-    	}
-    	else {
-    		ObjectNode documentObject = (ObjectNode)document;
-    		documentObject.put("check", true);    		
-    	}
-    	
+    public void toggleItemChecked(GroceryItem item) {
+    	item.toggleCheck();
     	CouchDocumentAsyncTask updateTask = new CouchDocumentAsyncTask(couchDbConnector, CouchDocumentAsyncTask.OPERATION_UPDATE);
-    	updateTask.execute(document);
+    	updateTask.execute(item);
     }
 	
-    public void deleteGroceryItem(JsonNode document) {
+    public void deleteGroceryItem(GroceryItem item) {
     	CouchDocumentAsyncTask deleteTask = new CouchDocumentAsyncTask(couchDbConnector, CouchDocumentAsyncTask.OPERATION_DELETE);
-    	deleteTask.execute(document);
+    	deleteTask.execute(item);
     }
     
 }

@@ -2,13 +2,11 @@ package com.couchbase.grocerysync;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 
-import org.codehaus.jackson.JsonNode;
 import org.ektorp.CouchDbConnector;
 import org.ektorp.DbInfo;
 import org.ektorp.ViewQuery;
-import org.ektorp.ViewResult;
-import org.ektorp.ViewResult.Row;
 
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -21,21 +19,21 @@ import android.widget.TextView;
 public class CouchListAdapter extends BaseAdapter {
 	
 	protected Context context;
-	public HashMap<String, JsonNode> rowMap;
+	public HashMap<String, GroceryItem> rowMap;
 	
 	public CouchListAdapter(Context context, CouchDbConnector couchDbConnector) {
 		this.context = context;
 		
-		rowMap = new HashMap<String, JsonNode>();
+		rowMap = new HashMap<String, GroceryItem>();
 		
 		DbInfo dbInfo = couchDbConnector.getDbInfo();
 		long lastUpdateSeq = dbInfo.getUpdateSeq();
 		
-		ViewResult vr = couchDbConnector.queryView(new ViewQuery().allDocs().includeDocs(true));
-		Iterator<Row> rowIterator = vr.iterator();
-		while(rowIterator.hasNext()) {
-			Row row = rowIterator.next();
-			rowMap.put(row.getId(), row.getDocAsNode());
+		List<GroceryItem> items = couchDbConnector.queryView(new ViewQuery().allDocs().includeDocs(true), GroceryItem.class);
+		Iterator<GroceryItem> itemIterator = items.iterator();
+		while(itemIterator.hasNext()) {
+			GroceryItem item = itemIterator.next();
+			rowMap.put(item.getId(), item);
 		}
 		
 		//create an ansyc task to get updates
@@ -68,19 +66,17 @@ public class CouchListAdapter extends BaseAdapter {
         }
         
         TextView label = (TextView) v.findViewById(R.id.label);
-        JsonNode document = (JsonNode)getItem(position);
-        JsonNode textNode = document.get("text");
-        if(textNode != null) {
-        	label.setText(textNode.getTextValue());
+        GroceryItem item  = (GroceryItem)getItem(position);
+        if(item.getText() != null) {
+        	label.setText(item.getText());
         }
         else {
         	label.setText("");
         }
         
-        JsonNode checkNode = document.get("check");
-        if(checkNode != null) {
+        if(item.getCheck() != null) {
 	        ImageView icon = (ImageView) v.findViewById(R.id.icon);
-	        if(checkNode.getBooleanValue()) {
+	        if(item.getCheck().booleanValue()) {
 	        	icon.setImageResource(R.drawable.list_area___checkbox___checked);
 	        }
 	        else {
